@@ -1,0 +1,2 @@
+self playing agent:
+https://www.kaggle.com/c/connectx/discussion/124611
