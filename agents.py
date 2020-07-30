@@ -1,3 +1,31 @@
+import pyximport
+pyximport.install()
+
+from c_agents import agen
+
+
+def agentc1(obs, conf):
+    return agen(obs.board, obs.mark, 1)
+
+def agentc2(obs, conf):
+    return agen(obs.board, obs.mark, 2)
+
+def agentc3(obs, conf):
+    return agen(obs.board, obs.mark, 3)
+
+def agentc5(obs, conf):
+    return agen(obs.board, obs.mark, 5)
+
+def agentc7(obs, conf):
+    return agen(obs.board, obs.mark, 7)
+
+def agentc9(obs, conf):
+    return agen(obs.board, obs.mark, 9)
+
+def agentc11(obs, conf):
+    return agen(obs.board, obs.mark, 11)
+
+
 def matrix_agent(obs, config):
     from random import choice
     import numpy as np

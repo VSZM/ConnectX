@@ -33,3 +33,16 @@ def serializeAndCompress(value, verbose=True):
     if verbose:
         print('Lenght of compressed and serialized object:', len(c_data))
     return b64.b64encode(c_data)
+
+
+# Making sure we are always playing mark 1
+def board_flip(mark, board):
+    if mark == 1:
+        return board
+
+    for i in range(board.shape[0]):
+        for j in range(board.shape[1]):
+            if board[i, j, 0] != 0:
+                board[i, j, 0] = board[i, j, 0]%2 + 1
+
+    return board
