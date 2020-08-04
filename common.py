@@ -25,6 +25,7 @@ def get_win_percentages_and_score(agent1, agent2, n_rounds=100, silent=False):
 # https://github.com/hill-a/stable-baselines/issues/372
 # https://www.kaggle.com/c/connectx/discussion/128591
 
+# https://www.kaggle.com/alenic/serializing-q-table-into-submission-py
 def serializeAndCompress(value, verbose=True):
     serializedValue = pickle.dumps(value)
     if verbose:
@@ -34,6 +35,12 @@ def serializeAndCompress(value, verbose=True):
         print('Lenght of compressed and serialized object:', len(c_data))
     return b64.b64encode(c_data)
 
+
+def decompressAndDeserialize(compressedData):
+    d_data_byte = b64.b64decode(compressedData)
+    data_byte = zlib.decompress(d_data_byte)
+    value = pickle.loads(data_byte)
+    return value
 
 # Making sure we are always playing mark 1
 def board_flip(mark, board):
