@@ -1,4 +1,8 @@
+import gym
 from random import random
+from numpy.random import choice
+
+from kaggle_environments import make
 
 from stable_baselines3.common.callbacks import BaseCallback
 from common import get_win_percentages_and_score, serializeAndCompress
@@ -12,6 +16,64 @@ def board_flip(mark, board):
             if board[i, j, 0] != 0:
                 board[i, j, 0] = board[i, j, 0] % 2 + 1
                 return board
+
+class ConnectFourGym():
+    def __init__(self, opponent_pool=np.asarray(['random']), distribution='even'):
+        self.ks_env = make("connectx", debug=True)
+        self.rows = self.ks_env.configuration.rows
+        self.columns = self.ks_env.configuration.columns
+        # Learn about spaces here: http://gym.openai.com/docs/#spaces
+        self.action_space = gym.spaces.Discrete(self.columns)
+        self.observation_space = gym.spaces.Box(low=0, high=1,
+                                                shape=(1, self.rows, self.columns), dtype=np.float)
+        # Tuple corresponding to the min and max possible rewards
+        self.reward_range = (-10, 1)
+        # StableBaselines throws error if these are not defined
+        self.spec = None
+        self.metadata = None
+        self.last_action = -1
+        self.iter = 0
+        self.opponent_pool = opponent_pool
+        self.distribution = distribution
+        self.init_env()
+
+    def init_env(self):
+        if self.distribution == 'even':
+            distribution = [1.0 / len(self.opponent_pool)] * len(self.opponent_pool)
+        else:
+            distribution = self.distribution
+        opponent = choice(self.opponent_pool, 1, p=distribution)[0]
+        # self.env = self.ks_env.train([opponent, None])
+        if self.iter % 2:
+            self.env = self.ks_env.train([None, opponent])
+        else:
+            self.env = self.ks_env.train([opponent, None])
+
+    def reset(self):
+        self.iter += 1
+        self.init_env()
+        self.obs = self.env.reset()
+        self.last_action = -1
+        return board_flip(self.obs.mark, np.array(self.obs['board']).reshape(1, self.rows, self.columns) / 2)
+
+    def change_reward(self, old_reward, done):
+        if old_reward == 1:  # The agent won the game
+            return 1
+        elif done:  # The opponent won the game
+            return -1
+        else:  # Reward 1/42
+            return 1 / (self.rows * self.columns)
+
+    def step(self, action):
+        # Check if agent's move is valid
+        is_valid = (self.obs['board'][int(action)] == 0)
+        if is_valid:  # Play the move
+            self.obs, old_reward, done, _ = self.env.step(int(action))
+            reward = self.change_reward(old_reward, done)
+        else:  # End the game and penalize agent
+            reward, done, _ = -10, True, {}
+        return board_flip(self.obs.mark,
+                          np.array(self.obs['board']).reshape(1, self.rows, self.columns) / 2), reward, done, _
 
 class SaveBestModelCallback(BaseCallback):
     """
