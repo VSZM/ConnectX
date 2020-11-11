@@ -43,7 +43,7 @@ class ConnectFourGym():
         else:
             distribution = self.distribution
         opponent = choice(self.opponent_pool, 1, p=distribution)[0]
-        # self.env = self.ks_env.train([opponent, None])
+        print("Iteration #"+str(self.iter))
         if self.iter % 2:
             self.env = self.ks_env.train([None, opponent])
         else:
@@ -72,6 +72,9 @@ class ConnectFourGym():
             reward = self.change_reward(old_reward, done)
         else:  # End the game and penalize agent
             reward, done, _ = -10, True, {}
+        if done:
+            # print("It is done, reset the board")
+            self.reset()
         return board_flip(self.obs.mark,
                           np.array(self.obs['board']).reshape(1, self.rows, self.columns) / 2), reward, done, _
 
@@ -100,7 +103,12 @@ class SaveBestModelCallback(BaseCallback):
         # # to have access to the parent object
         # self.parent = None  # type: Optional[BaseCallback]
         self.step_counter = 0
+
+        # RuntimeError: invalid multinomial distribution (encountering probability entry < 0)
+        # https://github.com/ray-project/ray/issues/10265#issuecomment-680160606
         self.best_value = -np.inf
+        # self.best_value = -1e15
+
         self.model_basename = model_basename
         self.save_frequency = save_frequency
         self.test_agents = test_agents

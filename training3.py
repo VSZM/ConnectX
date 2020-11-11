@@ -4,110 +4,25 @@ import torch as th
 from torch import nn as nn
 import torch.nn.functional as F
 
-from stable_baselines3 import PPO
+from stable_baselines3 import PPO, DQN
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 
+from agent_zoo3 import minimax_agent, matrix_agent, rule_based_agent, minmax_4, minmax_3, minmax_2, minmax_1
+from agents import agentc1, agentc2, agentc3, agentc5, agentc7, agentc9, agentc11
 from common import get_win_percentages_and_score
 from connect4gym3 import SaveBestModelCallback, ConnectFourGym
 
-def minimax_agent(obs, config):
-    ################################
-    # Imports and helper functions #
-    ################################
+agents = ['random', matrix_agent, rule_based_agent, agentc1, agentc2, agentc3, agentc5]
 
-    import numpy as np
-    import random
-
-    # Calculates score if agent drops piece in selected column
-    def score_move(grid, col, mark, config):
-        next_grid = drop_piece(grid, col, mark, config)
-        score = get_heuristic(next_grid, mark, config)
-        return score
-
-    # Helper function for score_move: gets board at next step if agent drops piece in selected column
-    def drop_piece(grid, col, mark, config):
-        next_grid = grid.copy()
-        for row in range(config.rows - 1, -1, -1):
-            if next_grid[row][col] == 0:
-                break
-        next_grid[row][col] = mark
-        return next_grid
-
-    # Helper function for score_move: calculates value of heuristic for grid
-    def get_heuristic(grid, mark, config):
-        num_twos = count_windows(grid, 2, mark, config)
-        num_threes = count_windows(grid, 3, mark, config)
-        num_fours = count_windows(grid, 4, mark, config)
-        num_twos_opp = count_windows(grid, 2, mark % 2 + 1, config)
-        num_threes_opp = count_windows(grid, 3, mark % 2 + 1, config)
-        score = num_fours * 10000 + num_threes * 10 + num_twos - num_twos_opp * 100 - num_threes_opp * 1000
-        return score
-
-    # Helper function for get_heuristic: checks if window satisfies heuristic conditions
-    def check_window(window, num_discs, piece, config):
-        return (window.count(piece) == num_discs and window.count(0) == config.inarow - num_discs)
-
-    # Helper function for get_heuristic: counts number of windows satisfying specified heuristic conditions
-    def count_windows(grid, num_discs, piece, config):
-        num_windows = 0
-        # horizontal
-        for row in range(config.rows):
-            for col in range(config.columns - (config.inarow - 1)):
-                window = list(grid[row, col:col + config.inarow])
-                if check_window(window, num_discs, piece, config):
-                    num_windows += 1
-        # vertical
-        for row in range(config.rows - (config.inarow - 1)):
-            for col in range(config.columns):
-                window = list(grid[row:row + config.inarow, col])
-                if check_window(window, num_discs, piece, config):
-                    num_windows += 1
-        # positive diagonal
-        for row in range(config.rows - (config.inarow - 1)):
-            for col in range(config.columns - (config.inarow - 1)):
-                window = list(grid[range(row, row + config.inarow), range(col, col + config.inarow)])
-                if check_window(window, num_discs, piece, config):
-                    num_windows += 1
-        # negative diagonal
-        for row in range(config.inarow - 1, config.rows):
-            for col in range(config.columns - (config.inarow - 1)):
-                window = list(grid[range(row, row - config.inarow, -1), range(col, col + config.inarow)])
-                if check_window(window, num_discs, piece, config):
-                    num_windows += 1
-        return num_windows
-
-    #########################
-    # Agent makes selection #
-    #########################
-
-    # Get list of valid moves
-    valid_moves = [c for c in range(config.columns) if obs.board[c] == 0]
-    # Convert the board to a 2D grid
-    grid = np.asarray(obs.board).reshape(config.rows, config.columns)
-    # Use the heuristic to assign a score to each possible board in the next turn
-    scores = dict(zip(valid_moves, [score_move(grid, col, obs.mark, config) for col in valid_moves]))
-    # Get a list of columns (moves) that maximize the heuristic
-    max_cols = [key for key in scores.keys() if scores[key] == max(scores.values())]
-    # Select at random from the maximize
-
-# env = ConnectFourGym([minimax_agent, 'random'])
-env = ConnectFourGym([minimax_agent])
+env = ConnectFourGym(agents)
 env
-
-# # Create directory for logging training information
-# log_dir = "log/"
-# os.makedirs(log_dir, exist_ok=True)
-#
-# # Logging progress
-# env = Monitor(env, log_dir, allow_early_resets=True)
-# env
 
 vec_env = DummyVecEnv([lambda: env])
 vec_env
 
-
 class Net(BaseFeaturesExtractor):
+
     def __init__(self, observation_space: gym.spaces.Box, features_dim: int = 512):
         super(Net, self).__init__(observation_space, features_dim)
         self.conv1 = nn.Conv2d(1, 32, kernel_size=3)
@@ -115,28 +30,26 @@ class Net(BaseFeaturesExtractor):
         self.fc3 = nn.Linear(384, features_dim)
 
     def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
+
+        x = F.relu(F.batch_norm(self.conv1(x), running_mean=None, running_var=None, training=True))
+        x = F.relu(F.batch_norm(self.conv2(x), running_mean=None, running_var=None, training=True))
         x = nn.Flatten()(x)
         x = F.relu(self.fc3(x))
-        return x
+        x = F.dropout(x)
 
+        return x
 
 policy_kwargs = {
     'activation_fn': th.nn.ReLU,
     'net_arch': [64, dict(pi=[32, 16], vf=[32, 16])],
     'features_extractor_class': Net,
 }
+
 learner = PPO('MlpPolicy', vec_env, policy_kwargs=policy_kwargs)
 
-eval_callback = SaveBestModelCallback('RDaneelConnect4_', 1000, ['random', minimax_agent])
+eval_callback = SaveBestModelCallback('RDaneelConnect4_', 1000, agents)
 
-learner.learn(total_timesteps=200_000, callback=eval_callback)
-# learner.learn(total_timesteps=200_000)
-
-# df = load_results(log_dir)['r']
-# df.rolling(window=1000).mean().plot()
-# df.tail(1000).mean()
+learner.learn(total_timesteps=5_000_000, callback=eval_callback)
 
 def testagent(obs, config):
     import numpy as np
@@ -144,7 +57,7 @@ def testagent(obs, config):
     action, _ = learner.predict(obs)
     return int(action)
 
-get_win_percentages_and_score(agent1=testagent, agent2=testagent)
+get_win_percentages_and_score(agent1=testagent, agent2='random')
 
 agent_path = 'submission.py'
 
@@ -167,10 +80,11 @@ submission_beginning = '''def agent(obs, config):
             self.action = nn.Linear(16, 7)
 
         def forward(self, x):
-            x = F.relu(self.conv1(x))
-            x = F.relu(self.conv2(x))
+            x = F.relu(F.batch_norm(self.conv1(x), running_mean=None, running_var=None, training=True))
+            x = F.relu(F.batch_norm(self.conv2(x), running_mean=None, running_var=None, training=True))
             x = nn.Flatten()(x)
             x = F.relu(self.fc3(x))
+            x = F.dropout(x)
             x = F.relu(self.shared1(x))
             x = F.relu(self.policy1(x))
             x = F.relu(self.policy2(x))
@@ -225,11 +139,4 @@ submission_ending = '''    model = Net()
 with open(agent_path, mode='a') as file:
     # file.write(f'\n    data = {learner.policy._get_data()}\n')
     file.write(submission_ending)
-
-# load submission.py
-f = open(agent_path)
-source = f.read()
-exec(source)
-
-# get_win_percentages_and_score(agent1=agent, agent2="random")
 
