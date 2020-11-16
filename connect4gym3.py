@@ -43,7 +43,6 @@ class ConnectFourGym():
         else:
             distribution = self.distribution
         opponent = choice(self.opponent_pool, 1, p=distribution)[0]
-        print("Iteration #"+str(self.iter))
         if self.iter % 2:
             self.env = self.ks_env.train([None, opponent])
         else:
@@ -73,7 +72,6 @@ class ConnectFourGym():
         else:  # End the game and penalize agent
             reward, done, _ = -10, True, {}
         if done:
-            # print("It is done, reset the board")
             self.reset()
         return board_flip(self.obs.mark,
                           np.array(self.obs['board']).reshape(1, self.rows, self.columns) / 2), reward, done, _
