@@ -1,6 +1,6 @@
 tensorflow==1.15.0
 gym==0.17.2
-numpy==1.18.5
+numpy==1.22.0
 pandas==1.0.5
 kaggle_environments==1.0.13
 stable_baselines==2.10.0
